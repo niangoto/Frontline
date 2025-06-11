@@ -1,6 +1,7 @@
 // Constants
 const PLAYER_COLORS = ["#FF0000", "#0000FF"];
 const UNIT_RADIUS = 15;
+const ARROW_LENGTH = 50;
 const INITIAL_POINTS = 90;
 const FRONT_LINE_COLOR = "#000000";
 const BG_COLOR = "#F0F0F0";
@@ -17,46 +18,21 @@ const SELECTION_COLOR = "#00FF00";
 const SELECTION_LINE_WIDTH = 2;
 const SELECTED_UNIT_COLOR = "#00FF00";
 const SELECTED_UNIT_LINE_WIDTH = 3;
-// Дължини на стрелките
-const BLACK_ARROW_LENGTH = 50;
-const BLUE_ARROW_LENGTH = BLACK_ARROW_LENGTH * 2;
 // Пример: границата е между lat1 и lat2 (север-юг), canvas.height = 600
 const LAT1 = 54.8; // северна граница (пример)
 const LAT2 = 50.3; // южна граница (пример)
 
-// DOM elements
-const canvas = document.getElementById('game-canvas');
-const ctx = canvas.getContext('2d');
-const gameInfo = document.getElementById('game-info');
-const readyBtn = document.getElementById('ready-btn');
-const settingsModal = document.getElementById('settings-modal');
-const turnInput = document.getElementById('turn-input');
-const confirmBtn = document.getElementById('confirm-btn');
-
-// Game data
-let gameData = {
-    playerUnits: [[], []],
-    frontLine: [],
-    selectedUnit: null,
-    phase: "placement",
-    currentPlayer: 0,
-    battlePhase: false,
-    turnCount: 0,
-    showArrows: true,
-    maxTurns: 3,
-    originalYPositions: [],
-    initialSpacing: 0,
-    capitals: [null, null], // Store capital positions for each player
-    selectionStart: null,
-    selectionEnd: null,
-    selectedUnits: [],
-    gameMode: "2players", // "2players" или "vsbot"
-};
-
-// Сега вече може:
-let ARROW_LENGTH = Math.max(40, Math.floor(canvas.width / gameData.maxTurns / 2));
-
 // Начално положение на фронтовата линия (географски координати)
+
+function latToY(lat) {
+    // Преобразува latitude към y в canvas
+    [16.0, 53.5],
+    [18.0, 53.0],
+    [20.0, 52.5],
+    [22.0, 51.5],
+    [23.5, 50.3]  // югоизток
+}
+
 function latToY(lat) {
     // Преобразува latitude към y в canvas
     return ((LAT1 - lat) / (LAT1 - LAT2)) * canvas.height;
@@ -88,7 +64,6 @@ class Game {
         this.turnCount = 0;
         this.maxTurns = 3;
         this.maxUnits = 10;
-        this.gameMode = "2players"; 
     }
 
     draw() {
@@ -129,7 +104,14 @@ class Game {
             this.ctx.strokeStyle = '#000000';
             this.ctx.lineWidth = 2;
             this.ctx.stroke();
-            this.ctx.lineWidth = 1;
+
+            // Draw points on front line
+            for (const point of this.frontLine) {
+                this.ctx.beginPath();
+                this.ctx.arc(point[0], point[1], 3, 0, Math.PI * 2);
+                this.ctx.fillStyle = '#000000';
+                this.ctx.fill();
+            }
         }
 
         // Draw units
@@ -152,43 +134,38 @@ class Game {
             gameInfo.textContent = `Играч ${this.currentPlayer + 1}: Задаване на посоки`;
         }
     }
-    update() {
-        // ... съществуващ код ...
-
-        // Проверка за бот
-        if (this.gameMode === "vsbot" && 
-            this.currentPlayer === 1 && 
-            (this.phase === "placement" || this.phase === "player2_arrows")) {
-            
-            if (!this.bot) {
-                this.bot = new BotController(this);
-            }
-            
-            // Изкуствено забавяне за по-естествено поведение
-            setTimeout(() => {
-                this.bot.makeDecision();
-                
-                // Автоматично маркиране като готов ако е необходимо
-                if (this.phase === "placement" && 
-                    this.playerUnits[1].length >= this.maxUnits) {
-                    this.handleReadyClick();
-                } else if (this.phase === "player2_arrows") {
-                    // Даваме малко време на стрелките да се визуализират
-                    setTimeout(() => this.handleReadyClick(), 500);
-                }
-            }, 1000);
-        }
-    }
 }
+
+// DOM elements
+const canvas = document.getElementById('game-canvas');
+const ctx = canvas.getContext('2d');
+const gameInfo = document.getElementById('game-info');
+const readyBtn = document.getElementById('ready-btn');
+const settingsModal = document.getElementById('settings-modal');
+const turnInput = document.getElementById('turn-input');
+const confirmBtn = document.getElementById('confirm-btn');
 
 // Create game instance
 let game = new Game(canvas);
 
 // Инициализация на играта
-let botController = null;
-if (gameData.gameMode === "vsbot") {
-    botController = new BotController(gameData);
-}
+let gameData = {
+    playerUnits: [[], []],
+    frontLine: [],
+    selectedUnit: null,
+    phase: "placement",
+    currentPlayer: 0,
+    battlePhase: false,
+    turnCount: 0,
+    showArrows: true,
+    maxTurns: 3,
+    originalYPositions: [],
+    initialSpacing: 0,
+    capitals: [null, null], // Store capital positions for each player
+    selectionStart: null,
+    selectionEnd: null,
+    selectedUnits: []
+};
 
 // Клас Unit
 class Unit {
@@ -338,28 +315,16 @@ class Unit {
         }
         
         if (showArrows) {
-            // Синя стрелка (вижда се само ако е зададена)
+            // Синя стрелка
             if (this.blueArrow) {
                 let [endX, endY] = this.blueArrow;
-                // Ограничаване на дължината до 2 * BLUE_ARROW_LENGTH
-                let dx = endX - this.x;
-                let dy = endY - this.y;
-                let dist = Math.hypot(dx, dy);
-                let maxLen = BLUE_ARROW_LENGTH;
-                if (dist > maxLen) {
-                    let scale = maxLen / dist;
-                    endX = this.x + dx * scale;
-                    endY = this.y + dy * scale;
-                }
-
                 ctx.beginPath();
                 ctx.moveTo(this.x, this.y);
                 ctx.lineTo(endX, endY);
                 ctx.strokeStyle = "#0000FF";
                 ctx.lineWidth = 2;
                 ctx.stroke();
-
-                // Накрайник на стрелката
+                
                 let angle = Math.atan2(endY - this.y, endX - this.x);
                 ctx.beginPath();
                 ctx.moveTo(endX, endY);
@@ -376,20 +341,18 @@ class Unit {
                 ctx.fill();
                 ctx.lineWidth = 1;
             }
-            // Черна стрелка (вижда се винаги, ако има зададена посока)
-            if (this.direction !== null && !this.isMoving) {
-                // ВИНАГИ дължина BLACK_ARROW_LENGTH
-                let blackLen = BLACK_ARROW_LENGTH;
-                let endX = this.x + blackLen * Math.cos(this.direction);
-                let endY = this.y + blackLen * Math.sin(this.direction);
+            // Черна стрелка
+            else if (this.direction !== null && !this.isMoving) {
+                let endX = this.x + ARROW_LENGTH * Math.cos(this.direction);
+                let endY = this.y + ARROW_LENGTH * Math.sin(this.direction);
                 ctx.beginPath();
                 ctx.moveTo(this.x, this.y);
                 ctx.lineTo(endX, endY);
                 ctx.strokeStyle = "#000000";
                 ctx.lineWidth = 2;
                 ctx.stroke();
-
-                let angle = this.direction;
+                
+                let angle = Math.atan2(endY - this.y, endX - this.x);
                 ctx.beginPath();
                 ctx.moveTo(endX, endY);
                 ctx.lineTo(
@@ -450,9 +413,6 @@ function initializeFrontLine() {
 
 // Проверка за поставяне на единица
 function handlePlacement(pos) {
-    if (gameData.gameMode === "vsbot" && gameData.currentPlayer === 1) {
-        return false;
-    }
     let [x, y] = pos;
     let player = gameData.currentPlayer;
     
@@ -504,53 +464,7 @@ function handlePlacement(pos) {
     
     let newUnit = new Unit(player, x, y);
     gameData.playerUnits[player].push(newUnit);
-    // Ако е режим срещу бот и червения играч е готов, активирай бота
-    if (gameData.gameMode === "vsbot" && 
-        gameData.phase === "placement" && 
-        gameData.currentPlayer === 1) {
-        setTimeout(() => activateBot(), 100);
-    }
-    if (gameData.gameMode === "vsbot" && gameData.currentPlayer === 1) {
-        setTimeout(activateBot, 100);
-    }
     return true;
-}
-// Нова функция за активиране на бота
-function activateBot() {
-    if (!game.bot) {
-        game.bot = new BotController(gameData);
-    }
-    
-    if (gameData.phase === "placement") {
-        // Ако ботът все още няма столица
-        if (!gameData.capitals[1]) {
-            game.bot.placeCapital();
-            // Проверяваме дали е поставена успешно
-            if (gameData.capitals[1]) {
-                setTimeout(activateBot, 100);
-            }
-            return;
-        }
-        
-        // Поставяме единици докато не стигнем максимума
-        if (gameData.playerUnits[1].length < gameData.maxUnits) {
-            game.bot.placeUnitEvenly(); // <-- ТУК!
-            setTimeout(activateBot, 100);
-        } else {
-            // Преминаваме към фазата на стрелките
-            gameData.currentPlayer = 0;
-            gameData.phase = "player1_arrows";
-            readyBtn.classList.remove('hidden');
-        }
-    } 
-    else if (gameData.phase === "player2_arrows") {
-        game.bot.handleArrowPhase();
-        setTimeout(() => {
-            gameData.phase = "battle";
-            readyBtn.classList.add('hidden');
-            calculateBattle();
-        }, 500);
-    }
 }
 function handleArrowSelection(pos, button) {
     let [x, y] = pos;
@@ -579,19 +493,25 @@ function resetSelection() {
 // Обработка на посока на стрелка
 function handleArrowDirection(pos, button) {
     if (!gameData.selectedUnit) return false;
-
+    
     let [x, y] = pos;
     let dx = x - gameData.selectedUnit.x;
     let dy = y - gameData.selectedUnit.y;
-
-    if (button === 2) {  // Десен бутон - синя стрелка (права)
-        gameData.selectedUnit.blueArrow = [x, y];
+    let dist = Math.sqrt(dx**2 + dy**2);
+    
+    if (button === 2) {  // Десен бутон - синя стрелка (2x дължина)
+        let maxDist = ARROW_LENGTH * 2;
+        if (dist > maxDist) {
+            dx = dx * maxDist / dist;
+            dy = dy * maxDist / dist;
+        }
+        gameData.selectedUnit.blueArrow = [gameData.selectedUnit.x + dx, gameData.selectedUnit.y + dy];
         gameData.selectedUnit.direction = null;
     } else {  // Ляв бутон - черна стрелка
         gameData.selectedUnit.direction = Math.atan2(dy, dx);
         gameData.selectedUnit.blueArrow = null;
     }
-
+    
     gameData.selectedUnit = null;
     return true;
 }
@@ -695,46 +615,26 @@ function checkAndPushUnits(pointIdx, newPoint, direction, pushingPlayer) {
 // Откриване и премахване на примки във фронтовата линия
 function detectAndRemoveLoops() {
     if (gameData.frontLine.length < 3) return;
-    let changed = true;
-    function segmentsIntersect(a, b, c, d) {
-        // Returns true if segments ab and cd intersect (including colinear/touching)
-        function orientation(p, q, r) {
-            let val = (q[1] - p[1]) * (r[0] - q[0]) - (q[0] - p[0]) * (r[1] - q[1]);
-            if (Math.abs(val) < 1e-8) return 0; // colinear
-            return val > 0 ? 1 : 2; // clock or counterclock wise
-        }
-        function onSegment(p, q, r) {
-            return Math.min(p[0], r[0]) <= q[0] && q[0] <= Math.max(p[0], r[0]) &&
-                   Math.min(p[1], r[1]) <= q[1] && q[1] <= Math.max(p[1], r[1]);
-        }
-        let o1 = orientation(a, b, c);
-        let o2 = orientation(a, b, d);
-        let o3 = orientation(c, d, a);
-        let o4 = orientation(c, d, b);
-        if (o1 !== o2 && o3 !== o4) return true;
-        if (o1 === 0 && onSegment(a, c, b)) return true;
-        if (o2 === 0 && onSegment(a, d, b)) return true;
-        if (o3 === 0 && onSegment(c, a, d)) return true;
-        if (o4 === 0 && onSegment(c, b, d)) return true;
-        return false;
-    }
-    while (changed) {
-        changed = false;
-        for (let i = 0; i < gameData.frontLine.length - 3; i++) {
-            for (let j = i + 2; j < gameData.frontLine.length - 1; j++) {
-                let a = gameData.frontLine[i];
-                let b = gameData.frontLine[i+1];
-                let c = gameData.frontLine[j];
-                let d = gameData.frontLine[j+1];
-                if (segmentsIntersect(a, b, c, d)) {
-                    let pointsToRemove = gameData.frontLine.slice(i+1, j+1);
-                    gameData.frontLine = [...gameData.frontLine.slice(0, i+1), ...gameData.frontLine.slice(j+1)];
-                    removeUnitsInLoop(pointsToRemove);
-                    changed = true;
-                    break;
-                }
+    
+    for (let i = 0; i < gameData.frontLine.length - 3; i++) {
+        for (let j = i + 2; j < gameData.frontLine.length - 1; j++) {
+            let a = gameData.frontLine[i];
+            let b = gameData.frontLine[i+1];
+            let c = gameData.frontLine[j];
+            let d = gameData.frontLine[j+1];
+            
+            function ccw(A, B, C) {
+                return (C[1]-A[1])*(B[0]-A[0]) > (B[1]-A[1])*(C[0]-A[0]);
             }
-            if (changed) break;
+            
+            let intersect = ccw(a,c,d) !== ccw(b,c,d) && ccw(a,b,c) !== ccw(a,b,d);
+            
+            if (intersect) {
+                let pointsToRemove = gameData.frontLine.slice(i+1, j+1);
+                gameData.frontLine = [...gameData.frontLine.slice(0, i+1), ...gameData.frontLine.slice(j+1)];
+                removeUnitsInLoop(pointsToRemove);
+                return;
+            }
         }
     }
 }
@@ -843,7 +743,6 @@ function calculateBattle() {
     }
 
     // Обработка на всяка точка от фронтовата линия
-    gameData.frontLineWinners = [null, null];
     for (let pointIdx = 0; pointIdx < gameData.frontLine.length; pointIdx++) {
         let [px, py] = gameData.frontLine[pointIdx];
         let closest = [[], []];  // [player0, player1]
@@ -912,69 +811,35 @@ function calculateBattle() {
         // Движение на фронтовата точка според по-силния играч
         if (strengths[0] > strengths[1] && winningUnits[0]) {
             if (Array.isArray(winningUnits[0])) {
+                // Две единици влияят
                 let [unit1, unit2] = winningUnits[0];
                 let avgDirection = calculateAverageDirection(unit1, unit2);
+                
                 if (avgDirection !== null && !isMovementTowardOwnTerritory(unit1, avgDirection)) {
-                    if (pointIdx === 0 || pointIdx === gameData.frontLine.length - 1) {
-                        // Крайна точка: мести само по x, y остава фиксирано
-                        let moveX = Math.min(MAX_MOVE_DISTANCE, 5 * (player === 0 ? -1 : 1));
-                        let newPx = px + moveX;
-                        let newPy = py; // y не се променя
-                        gameData.frontLine[pointIdx] = [newPx, py];
-                    } else {
-                        // --- стандартно местене ---
-                        let newPx = px + Math.min(MAX_MOVE_DISTANCE, 5 * Math.cos(avgDirection));
-                        let newPy = py + Math.min(MAX_MOVE_DISTANCE, 5 * Math.sin(avgDirection));
-                        // --- ПРОВЕРКА дали новата точка е в старата територия на печелилия играч ---
-                        let oldTerritoryPoly = unit1.player === 0
-                            ? [[0, 0], ...gameData.frontLine, [0, canvas.height]]
-                            : [[canvas.width, 0], ...gameData.frontLine, [canvas.width, canvas.height]];
-                        if (pointInPolygon([newPx, newPy], oldTerritoryPoly)) {
-                            // Ако е в старата територия, не местим точката
-                            newPx = px;
-                            newPy = py;
-                        }
-                        checkAndPushUnits(pointIdx, [newPx, newPy], avgDirection, 0);
-                        gameData.frontLine[pointIdx] = [newPx, newPy];
-                        detectAndRemoveLoops();
-                        // Отбелязваме напредване
-                        if ((newPx - px) * (unit1.player === 0 ? -1 : 1) > 0) {
-                            unit1.forwardMoves += 0.5;
-                            unit2.forwardMoves += 0.5;
-                        }
+                    let newPx = px + Math.min(MAX_MOVE_DISTANCE, 5 * Math.cos(avgDirection));
+                    let newPy = py + Math.min(MAX_MOVE_DISTANCE, 5 * Math.sin(avgDirection));
+                    
+                    checkAndPushUnits(pointIdx, [newPx, newPy], avgDirection, 0);
+                    gameData.frontLine[pointIdx] = [newPx, newPy];
+                    
+                    // Отбелязваме напредване
+                    if ((newPx - px) * (unit1.player === 0 ? -1 : 1) > 0) {
+                        unit1.forwardMoves += 0.5;
+                        unit2.forwardMoves += 0.5;
                     }
                 }
             } else {
                 // Една единица влияе
                 let unit = winningUnits[0];
                 if (unit.direction !== null && !isMovementTowardOwnTerritory(unit, unit.direction)) {
-                    if (pointIdx === 0 || pointIdx === gameData.frontLine.length - 1) {
-                        // Крайна точка: мести само по x, y остава фиксирано
-                        let moveX = Math.min(MAX_MOVE_DISTANCE, 5 * (player === 0 ? -1 : 1));
-                        let newPx = px + moveX;
-                        let newPy = py; // y не се променя
-                        gameData.frontLine[pointIdx] = [newPx, py];
-                    } else {
-                        // --- стандартно местене ---
-                        let newPx = px + Math.min(MAX_MOVE_DISTANCE, 5 * Math.cos(unit.direction));
-                        let newPy = py + Math.min(MAX_MOVE_DISTANCE, 5 * Math.sin(unit.direction));
-                        // --- ПРОВЕРКА дали новата точка е в старата територия на печелилия играч ---
-                        let oldTerritoryPoly = unit.player === 0
-                            ? [[0, 0], ...gameData.frontLine, [0, canvas.height]]
-                            : [[canvas.width, 0], ...gameData.frontLine, [canvas.width, canvas.height]];
-                        if (pointInPolygon([newPx, newPy], oldTerritoryPoly)) {
-                            // Ако е в старата територия, не местим точката
-                            newPx = px;
-                            newPy = py;
-                        }
-                        checkAndPushUnits(pointIdx, [newPx, newPy], unit.direction, 0);
-                        gameData.frontLine[pointIdx] = [newPx, newPy];
-                        
-                        detectAndRemoveLoops();
-                        // Отбелязваме напредване
-                        if ((newPx - px) * (unit.player === 0 ? -1 : 1) > 0) {
-                            unit.forwardMoves += 1;
-                        }
+                    let newPx = px + Math.min(MAX_MOVE_DISTANCE, 5 * Math.cos(unit.direction));
+                    let newPy = py + Math.min(MAX_MOVE_DISTANCE, 5 * Math.sin(unit.direction));
+                    
+                    checkAndPushUnits(pointIdx, [newPx, newPy], unit.direction, 0);
+                    gameData.frontLine[pointIdx] = [newPx, newPy];
+                    
+                    if ((newPx - px) * (unit.player === 0 ? -1 : 1) > 0) {
+                        unit.forwardMoves += 1;
                     }
                 }
             }
@@ -985,63 +850,30 @@ function calculateBattle() {
                 let avgDirection = calculateAverageDirection(unit1, unit2);
                 
                 if (avgDirection !== null && !isMovementTowardOwnTerritory(unit1, avgDirection)) {
-                    if (pointIdx === 0 || pointIdx === gameData.frontLine.length - 1) {
-                        // Крайна точка: мести само по x, y остава фиксирано
-                        let moveX = Math.min(MAX_MOVE_DISTANCE, 5);
-                        let newPx = px + moveX;
-                        let newPy = py; // y не се променя
-                        gameData.frontLine[pointIdx] = [newPx, py];
-                    } else {
-                        // --- стандартно местене ---
-                        let newPx = px + Math.min(MAX_MOVE_DISTANCE, 5 * Math.cos(avgDirection));
-                        let newPy = py + Math.min(MAX_MOVE_DISTANCE, 5 * Math.sin(avgDirection));
-                        // --- ПРОВЕРКА дали новата точка е в старата територия на печелилия играч ---
-                        let oldTerritoryPoly = unit1.player === 0
-                            ? [[0, 0], ...gameData.frontLine, [0, canvas.height]]
-                            : [[canvas.width, 0], ...gameData.frontLine, [canvas.width, canvas.height]];
-                        if (pointInPolygon([newPx, newPy], oldTerritoryPoly)) {
-                            // Ако е в старата територия, не местим точката
-                            newPx = px;
-                            newPy = py;
-                        }
-                        checkAndPushUnits(pointIdx, [newPx, newPy], avgDirection, 1);
-                        gameData.frontLine[pointIdx] = [newPx, newPy];
-                        
-                        // Отбелязваме напредване
-                        if ((newPx - px) * (unit1.player === 0 ? -1 : 1) > 0) {
-                            unit2.forwardMoves += 0.5;
-                        }
+                    let newPx = px + Math.min(MAX_MOVE_DISTANCE, 5 * Math.cos(avgDirection));
+                    let newPy = py + Math.min(MAX_MOVE_DISTANCE, 5 * Math.sin(avgDirection));
+                    
+                    checkAndPushUnits(pointIdx, [newPx, newPy], avgDirection, 1);
+                    gameData.frontLine[pointIdx] = [newPx, newPy];
+                    
+                    // Отбелязваме напредване
+                    if ((newPx - px) * (unit1.player === 0 ? -1 : 1) > 0) {
+                        unit1.forwardMoves += 0.5;
+                        unit2.forwardMoves += 0.5;
                     }
                 }
             } else {
                 // Една единица влияе
                 let unit = winningUnits[1];
                 if (unit.direction !== null && !isMovementTowardOwnTerritory(unit, unit.direction)) {
-                    if (pointIdx === 0 || pointIdx === gameData.frontLine.length - 1) {
-                        // Крайна точка: мести само по x, y остава фиксирано
-                        let moveX = Math.min(MAX_MOVE_DISTANCE, 5);
-                        let newPx = px + moveX;
-                        let newPy = py; // y не се променя
-                        gameData.frontLine[pointIdx] = [newPx, py];
-                    } else {
-                        // --- стандартно местене ---
-                        let newPx = px + Math.min(MAX_MOVE_DISTANCE, 5 * Math.cos(unit.direction));
-                        let newPy = py + Math.min(MAX_MOVE_DISTANCE, 5 * Math.sin(unit.direction));
-                        // --- ПРОВЕРКА дали новата точка е в старата територия на печелилия играч ---
-                        let oldTerritoryPoly = unit.player === 0
-                            ? [[0, 0], ...gameData.frontLine, [0, canvas.height]]
-                            : [[canvas.width, 0], ...gameData.frontLine, [canvas.width, canvas.height]];
-                        if (pointInPolygon([newPx, newPy], oldTerritoryPoly)) {
-                            // Ако е в старата територия, не местим точката
-                            newPx = px;
-                            newPy = py;
-                        }
-                        checkAndPushUnits(pointIdx, [newPx, newPy], unit.direction, 1);
-                        gameData.frontLine[pointIdx] = [newPx, newPy];
-                        
-                        if ((newPx - px) * (unit.player === 0 ? -1 : 1) > 0) {
-                            unit.forwardMoves += 1;
-                        }
+                    let newPx = px + Math.min(MAX_MOVE_DISTANCE, 5 * Math.cos(unit.direction));
+                    let newPy = py + Math.min(MAX_MOVE_DISTANCE, 5 * Math.sin(unit.direction));
+                    
+                    checkAndPushUnits(pointIdx, [newPx, newPy], unit.direction, 1);
+                    gameData.frontLine[pointIdx] = [newPx, newPy];
+                    
+                    if ((newPx - px) * (unit.player === 0 ? -1 : 1) > 0) {
+                        unit.forwardMoves += 1;
                     }
                 }
             }
@@ -1091,8 +923,6 @@ function adjustFrontLine() {
         }
     }
     gameData.frontLine = newLine;
-    gameData.frontLine[0][1] = 0;
-    gameData.frontLine[gameData.frontLine.length - 1][1] = canvas.height;
 }
 
 // Подготовка на движенията на единиците
@@ -1101,23 +931,13 @@ function prepareUnitMovements() {
         for (let unit of gameData.playerUnits[player]) {
             if (unit.blueArrow) {
                 let [endX, endY] = unit.blueArrow;
-                // Ограничаване на дължината при движение
-                let dx = endX - unit.x;
-                let dy = endY - unit.y;
-                let dist = Math.hypot(dx, dy);
-                let maxLen = BLUE_ARROW_LENGTH;
-                if (dist > maxLen) {
-                    let scale = maxLen / dist;
-                    endX = unit.x + dx * scale;
-                    endY = unit.y + dy * scale;
-                }
                 unit.targetX = endX;
                 unit.targetY = endY;
                 unit.isMoving = true;
                 unit.moveProgress = 0;
             } else if (unit.direction !== null) {
-                let endX = unit.x + BLACK_ARROW_LENGTH * Math.cos(unit.direction);
-                let endY = unit.y + BLACK_ARROW_LENGTH * Math.sin(unit.direction);
+                let endX = unit.x + ARROW_LENGTH * Math.cos(unit.direction);
+                let endY = unit.y + ARROW_LENGTH * Math.sin(unit.direction);
                 unit.targetX = endX;
                 unit.targetY = endY;
                 unit.isMoving = true;
@@ -1180,7 +1000,7 @@ function handleGroupArrowDirection(pos, button) {
     
     for (const unit of gameData.selectedUnits) {
         if (button === 2) {  // Десен бутон - синя стрелка (2x дължина)
-            const maxDist = BLUE_ARROW_LENGTH;
+            const maxDist = ARROW_LENGTH * 2;
             const scaledDx = dx * maxDist / dist;
             const scaledDy = dy * maxDist / dist;
             unit.blueArrow = [unit.x + scaledDx, unit.y + scaledDy];
@@ -1289,22 +1109,10 @@ function drawGame() {
         ctx.lineWidth = 1;
         
         // Точки на фронтовата линия
-        // for (const point of gameData.frontLine) {
-        //     ctx.beginPath();
-        //     ctx.arc(point[0], point[1], 3, 0, Math.PI * 2);
-        //     ctx.fillStyle = FRONT_LINE_COLOR;
-        //     ctx.fill();
-        // }
-
-        if (gameData.frontLineWinners) {
+        for (let point of gameData.frontLine) {
             ctx.beginPath();
-            ctx.arc(gameData.frontLine[0][0], 0, 7, 0, Math.PI * 2);
-            ctx.fillStyle = gameData.frontLineWinners[0] === 0 ? "#FF0000" : "#0000FF";
-            ctx.fill();
-
-            ctx.beginPath();
-            ctx.arc(gameData.frontLine[gameData.frontLine.length - 1][0], canvas.height, 7, 0, Math.PI * 2);
-            ctx.fillStyle = gameData.frontLineWinners[1] === 0 ? "#FF0000" : "#0000FF";
+            ctx.arc(point[0], point[1], 3, 0, Math.PI * 2);
+            ctx.fillStyle = FRONT_LINE_COLOR;
             ctx.fill();
         }
     }
@@ -1394,6 +1202,7 @@ function gameLoop() {
     if (gameData.battlePhase) {
         updateUnits();
     }
+    
     drawGame();
     requestAnimationFrame(gameLoop);
 }
@@ -1441,11 +1250,6 @@ canvas.addEventListener('mousemove', function(e) {
             }
         }
     }
-    if (gameData.phase.endsWith("_arrows") && !gameData.battlePhase && gameData.selectedUnit && e.buttons === 2) {
-        let rect = canvas.getBoundingClientRect();
-        let pos = [e.clientX - rect.left, e.clientY - rect.top];
-        gameData.selectedUnit.blueArrow = [pos[0], pos[1]];
-    }
 });
 
 canvas.addEventListener('mouseup', function(e) {
@@ -1464,26 +1268,20 @@ canvas.addEventListener('mouseup', function(e) {
         }
     }
 });
-
-canvas.addEventListener('contextmenu', function(e) {
-    e.preventDefault();
-});
-
 // Бутон за готовност
 readyBtn.addEventListener('click', function() {
     if (gameData.phase === "placement") {
-        if (!gameData.capitals[gameData.currentPlayer]) return;
-        if (gameData.gameMode === "vsbot" && gameData.currentPlayer === 1) {
-            readyBtn.classList.add('hidden');
-            setTimeout(activateBot, 100);
-            return; // Не сменяй currentPlayer, ботът ще го направи
+        // Check if capital is placed
+        if (!gameData.capitals[gameData.currentPlayer]) {
+            return; // Don't allow proceeding without capital
         }
+        
         if (gameData.playerUnits[gameData.currentPlayer].length > 0) {
             gameData.currentPlayer = 1 - gameData.currentPlayer;
-            if (gameData.currentPlayer === 1 && gameData.gameMode === "vsbot") {
+            // Hide ready button during second player placement
+            if (gameData.currentPlayer === 1) {
                 readyBtn.classList.add('hidden');
-                setTimeout(activateBot, 100);
-            } else if (gameData.currentPlayer === 0) {
+            } else {
                 gameData.phase = "player1_arrows";
             }
         }
@@ -1491,9 +1289,6 @@ readyBtn.addEventListener('click', function() {
         if (gameData.phase === "player1_arrows") {
             gameData.phase = "player2_arrows";
             gameData.currentPlayer = 1;
-            if (gameData.gameMode === "vsbot") {
-                setTimeout(activateBot, 100);
-            }
         } else if (gameData.phase === "player2_arrows") {
             gameData.phase = "battle";
             readyBtn.classList.add('hidden');
@@ -1506,15 +1301,11 @@ readyBtn.addEventListener('click', function() {
 document.getElementById('confirm-btn').addEventListener('click', function() {
     let turns = parseInt(document.getElementById('turn-input').value);
     let units = parseInt(document.getElementById('units-input').value);
-    // Запазваме избрания режим
-    const modeSelect = document.getElementById('mode-select');
-    game.gameMode = modeSelect.value;
-    gameData.gameMode = modeSelect.value;
+    
     if (turns >= 1 && turns <= MAX_TURNS && units >= 1 && units <= MAX_UNITS) {
         // Запазваме настройките в gameData
         gameData.maxTurns = turns;
         gameData.maxUnits = units;
-        ARROW_LENGTH = Math.max(40, Math.floor(canvas.width / gameData.maxTurns / 2));
         
         // Актуализираме текста за брой единици
         if (gameData.phase === "placement") {
@@ -1569,7 +1360,7 @@ function checkForLoss() {
 
         // Проверка дали играчът е загубил всичките си единици
         if (gameData.playerUnits[player].length === 0) {
-            endGame(opponent, `Играч ${опонент + 1} печели! Играч ${player + 1} загуби всичките си единици.`);
+            endGame(opponent, `Играч ${opponent + 1} печели! Играч ${player + 1} загуби всичките си единици.`);
             return;
         }
 
@@ -1578,7 +1369,7 @@ function checkForLoss() {
         if (capital) {
             const isInOpponentTerritory = isCapitalInOpponentTerritory(player, capital);
             if (isInOpponentTerritory) {
-                endGame(opponent, `Играч ${опонент + 1} печели! Столицата на играч ${player + 1} е превзета.`);
+                endGame(opponent, `Играч ${opponent + 1} печели! Столицата на играч ${player + 1} е превзета.`);
                 return;
             }
         }
@@ -1617,7 +1408,7 @@ function interpolateFrontLine(points, count) {
     let totalLength = 0;
     for (let i = 1; i < points.length; i++) {
         let dx = points[i][0] - points[i-1][0];
-        let dy = points[i][1] - points[i-1];
+        let dy = points[i][1] - points[i-1][1];
         let len = Math.sqrt(dx*dx + dy*dy);
         lengths.push(len);
         totalLength += len;
@@ -1706,7 +1497,9 @@ function fillFrontLineEnds(frontLine, spacing, canvas) {
     let first = frontLine[0];
     if (first[1] > 0) {
         let steps = Math.ceil(first[1] / spacing);
-        let dx = (frontLine[1][0] - first[0]) / (frontLine[1][1] - first[1]);
+        // Avoid division by zero
+        let dy = frontLine[1][1] - first[1];
+        let dx = (dy !== 0) ? (frontLine[1][0] - first[0]) / dy : 0;
         for (let i = 1; i <= steps; i++) {
             let y = first[1] - i * spacing;
             if (y < 0) y = 0;
@@ -1719,10 +1512,11 @@ function fillFrontLineEnds(frontLine, spacing, canvas) {
 
     // Запълни отдолу
     let last = frontLine[frontLine.length - 1];
-   
     if (last[1] < canvas.height) {
         let steps = Math.ceil((canvas.height - last[1]) / spacing);
-        let dx = (last[0] - frontLine[frontLine.length - 2][0]) / (last[1] - frontLine[frontLine.length - 2][1]);
+        // Avoid division by zero
+        let dy = last[1] - frontLine[frontLine.length - 2][1];
+        let dx = (dy !== 0) ? (last[0] - frontLine[frontLine.length - 2][0]) / dy : 0;
         for (let i = 1; i <= steps; i++) {
             let y = last[1] + i * spacing;
             if (y > canvas.height) y = canvas.height;
@@ -1746,14 +1540,5 @@ function isInOwnTerritory(player, x, y) {
         // Син: дясната територия
         let bluePoly = [[canvas.width, 0], ...gameData.frontLine, [canvas.width, canvas.height]];
         return pointInPolygon([x, y], bluePoly);
-    }
-}
-
-function nextPlacementTurn() {
-    gameData.currentPlayer = (gameData.currentPlayer + 1) % 2;
-    if (gameData.gameMode === "vsbot" && gameData.currentPlayer === 1) {
-        botController.makeDecision();
-        // След като ботът разположи, премини към следващия ход:
-        gameData.currentPlayer = 0;
     }
 }
