@@ -223,7 +223,6 @@ class Unit {
     }
 
     updatePosition() {
-        const scale = getUnitScale();
         // Първо обработваме избутването
         if (this.beingPushed) {
             this.x = this.prevX + (this.pushTargetX - this.prevX) * this.pushProgress;
@@ -245,7 +244,7 @@ class Unit {
             let tooClose = false;
             for (let point of gameData.frontLine) {
                 let dist = Math.sqrt((this.x - point[0])**2 + (this.y - point[1])**2);
-                if (dist < UNIT_RADIUS * scale) {
+                if (dist < UNIT_RADIUS) {
                     tooClose = true;
                     break;
                 }
@@ -269,10 +268,10 @@ class Unit {
 
             // Ако ще излезе извън екрана — спри движението (не премахвай)
             if (
-                this.x - UNIT_RADIUS * scale < 0 ||
-                this.x + UNIT_RADIUS * scale > canvas.width ||
-                this.y - UNIT_RADIUS * scale < 0 ||
-                this.y + UNIT_RADIUS * scale > canvas.height
+                this.x - UNIT_RADIUS < 0 ||
+                this.x + UNIT_RADIUS > canvas.width ||
+                this.y - UNIT_RADIUS < 0 ||
+                this.y + UNIT_RADIUS > canvas.height
             ) {
                 this.beingPushed = false;
                 this.isMoving = false;
@@ -308,10 +307,10 @@ class Unit {
 
             // Ако ще излезе извън екрана — спри движението (не премахвай)
             if (
-                newX - UNIT_RADIUS * scale < 0 ||
-                newX + UNIT_RADIUS * scale > canvas.width ||
-                newY - UNIT_RADIUS * scale < 0 ||
-                newY + UNIT_RADIUS * scale > canvas.height
+                newX - UNIT_RADIUS < 0 ||
+                newX + UNIT_RADIUS > canvas.width ||
+                newY - UNIT_RADIUS < 0 ||
+                newY + UNIT_RADIUS > canvas.height
             ) {
                 this.isMoving = false;
                 this.blockedByFront = true;
@@ -342,7 +341,7 @@ class Unit {
 
             for (let point of gameData.frontLine) {
                 let dist = Math.sqrt((newX - point[0])**2 + (newY - point[1])**2);
-                if (dist < MIN_DISTANCE_TO_FRONT * scale) {
+                if (dist < MIN_DISTANCE_TO_FRONT) {
                     tooClose = true;
                     if (dist < closestDist) {
                         closestDist = dist;
@@ -390,16 +389,15 @@ class Unit {
 
     draw(selected = false, showArrows = true) {
         // Рисуване на единицата
-        const scale = getUnitScale();
         ctx.beginPath();
-        ctx.arc(this.x, this.y, UNIT_RADIUS * scale, 0, Math.PI * 2);
+        ctx.arc(this.x, this.y, UNIT_RADIUS, 0, Math.PI * 2);
         ctx.fillStyle = PLAYER_COLORS[this.player];
         ctx.fill();
         
         // Дебел зелен контур за маркирани единици
         if (gameData.selectedUnits.includes(this)) {
             ctx.strokeStyle = SELECTED_UNIT_COLOR;
-            ctx.lineWidth = SELECTED_UNIT_LINE_WIDTH * scale;
+            ctx.lineWidth = SELECTED_UNIT_LINE_WIDTH;
             ctx.stroke();
             ctx.lineWidth = 1;
         } else {
@@ -411,32 +409,35 @@ class Unit {
             // Синя стрелка (вижда се само ако е зададена)
             if (this.blueArrow) {
                 let [endX, endY] = this.blueArrow;
+                // Ограничаване на дължината до 2 * BLUE_ARROW_LENGTH
                 let dx = endX - this.x;
                 let dy = endY - this.y;
                 let dist = Math.hypot(dx, dy);
-                let maxLen = BLUE_ARROW_LENGTH * scale;
+                let maxLen = BLUE_ARROW_LENGTH;
                 if (dist > maxLen) {
-                    let s = maxLen / dist;
-                    endX = this.x + dx * s;
-                    endY = this.y + dy * s;
+                    let scale = maxLen / dist;
+                    endX = this.x + dx * scale;
+                    endY = this.y + dy * scale;
                 }
+
                 ctx.beginPath();
                 ctx.moveTo(this.x, this.y);
                 ctx.lineTo(endX, endY);
                 ctx.strokeStyle = "#0000FF";
-                ctx.lineWidth = 2 * scale;
+                ctx.lineWidth = 2;
                 ctx.stroke();
 
+                // Накрайник на стрелката
                 let angle = Math.atan2(endY - this.y, endX - this.x);
                 ctx.beginPath();
                 ctx.moveTo(endX, endY);
                 ctx.lineTo(
-                    endX - 10 * scale * Math.cos(angle - Math.PI/6),
-                    endY - 10 * scale * Math.sin(angle - Math.PI/6)
+                    endX - 10 * Math.cos(angle - Math.PI/6),
+                    endY - 10 * Math.sin(angle - Math.PI/6)
                 );
                 ctx.lineTo(
-                    endX - 10 * scale * Math.cos(angle + Math.PI/6),
-                    endY - 10 * scale * Math.sin(angle + Math.PI/6)
+                    endX - 10 * Math.cos(angle + Math.PI/6),
+                    endY - 10 * Math.sin(angle + Math.PI/6)
                 );
                 ctx.closePath();
                 ctx.fillStyle = "#0000FF";
@@ -445,26 +446,27 @@ class Unit {
             }
             // Черна стрелка (вижда се винаги, ако има зададена посока)
             if (this.direction !== null && !this.isMoving) {
-                let blackLen = BLACK_ARROW_LENGTH * scale;
+                // ВИНАГИ дължина BLACK_ARROW_LENGTH
+                let blackLen = BLACK_ARROW_LENGTH;
                 let endX = this.x + blackLen * Math.cos(this.direction);
                 let endY = this.y + blackLen * Math.sin(this.direction);
                 ctx.beginPath();
                 ctx.moveTo(this.x, this.y);
                 ctx.lineTo(endX, endY);
                 ctx.strokeStyle = "#000000";
-                ctx.lineWidth = 2 * scale;
+                ctx.lineWidth = 2;
                 ctx.stroke();
 
                 let angle = this.direction;
                 ctx.beginPath();
                 ctx.moveTo(endX, endY);
                 ctx.lineTo(
-                    endX - 10 * scale * Math.cos(angle - Math.PI/6),
-                    endY - 10 * scale * Math.sin(angle - Math.PI/6)
+                    endX - 10 * Math.cos(angle - Math.PI/6),
+                    endY - 10 * Math.sin(angle - Math.PI/6)
                 );
                 ctx.lineTo(
-                    endX - 10 * scale * Math.cos(angle + Math.PI/6),
-                    endY - 10 * scale * Math.sin(angle + Math.PI/6)
+                    endX - 10 * Math.cos(angle + Math.PI/6),
+                    endY - 10 * Math.sin(angle + Math.PI/6)
                 );
                 ctx.closePath();
                 ctx.fillStyle = "#000000";
@@ -542,19 +544,18 @@ function initializeFrontLine() {
 
 // Проверка за поставяне на единица
 function handlePlacement(pos) {
-    const scale = getUnitScale();
     // WW2 карта: не позволявай избор на столица
     if (gameData.ww2CapitalsLocked) {
         let [x, y] = pos;
         let player = gameData.currentPlayer;
 
-        // Забрани поставане в морето
+        // Забрани поставяне в морето
         if (isInSeaZone(x, y)) return false;
 
         // Проверка за премахване на съществуваща единица
         for (let i = 0; i < gameData.playerUnits[player].length; i++) {
             let unit = gameData.playerUnits[player][i];
-            if (Math.sqrt((x - unit.x)**2 + (y - unit.y)**2) <= UNIT_RADIUS * scale) {
+            if (Math.sqrt((x - unit.x)**2 + (y - unit.y)**2) <= UNIT_RADIUS) {
                 gameData.playerUnits[player].splice(i, 1);
                 return true;
             }
@@ -566,7 +567,7 @@ function handlePlacement(pos) {
         }
         
         // Проверка за разстояние от фронтова линия
-        let minDistance = UNIT_RADIUS * 1.5 * scale;
+        let minDistance = UNIT_RADIUS * 1.5;
         for (let point of gameData.frontLine) {
             if (Math.sqrt((x - point[0])**2 + (y - point[1])**2) < minDistance) {
                 return false;
@@ -575,7 +576,7 @@ function handlePlacement(pos) {
         
         // Проверка за разстояние от други единици
         for (let unit of gameData.playerUnits[player]) {
-            if (Math.sqrt((x - unit.x)**2 + (y - unit.y)**2) < UNIT_RADIUS * 2 * scale) {
+            if (Math.sqrt((x - unit.x)**2 + (y - unit.y)**2) < UNIT_RADIUS * 2) {
                 return false;
             }
         }
@@ -583,7 +584,7 @@ function handlePlacement(pos) {
         // Проверка за разстояние от столицата
         if (gameData.capitals[player]) {
             let capital = gameData.capitals[player];
-            if (Math.sqrt((x - capital[0])**2 + (y - capital[1])**2) < UNIT_RADIUS * 2 * scale) {
+            if (Math.sqrt((x - capital[0])**2 + (y - capital[1])**2) < UNIT_RADIUS * 2) {
                 return false;
             }
         }
@@ -600,7 +601,7 @@ function handlePlacement(pos) {
     let [x, y] = pos;
     let player = gameData.currentPlayer;
 
-    // Забрани поставане в морето (за всички карти, ако има дефинирана морска зона)
+    // Забрани поставяне в морето (за всички карти, ако има дефинирана морска зона)
     if (isInSeaZone(x, y)) return false;
 
     // Проверка за столица
@@ -611,7 +612,7 @@ function handlePlacement(pos) {
     // Проверка за премахване на съществуваща единица
     for (let i = 0; i < gameData.playerUnits[player].length; i++) {
         let unit = gameData.playerUnits[player][i];
-        if (Math.sqrt((x - unit.x)**2 + (y - unit.y)**2) <= UNIT_RADIUS * scale) {
+        if (Math.sqrt((x - unit.x)**2 + (y - unit.y)**2) <= UNIT_RADIUS) {
             gameData.playerUnits[player].splice(i, 1);
             return true;
         }
@@ -623,7 +624,7 @@ function handlePlacement(pos) {
     }
     
     // Проверка за разстояние от фронтова линия
-    let minDistance = UNIT_RADIUS * 1.5 * scale;
+    let minDistance = UNIT_RADIUS * 1.5;
     for (let point of gameData.frontLine) {
         if (Math.sqrt((x - point[0])**2 + (y - point[1])**2) < minDistance) {
             return false;
@@ -632,7 +633,7 @@ function handlePlacement(pos) {
     
     // Проверка за разстояние от други единици
     for (let unit of gameData.playerUnits[player]) {
-        if (Math.sqrt((x - unit.x)**2 + (y - unit.y)**2) < UNIT_RADIUS * 2 * scale) {
+        if (Math.sqrt((x - unit.x)**2 + (y - unit.y)**2) < UNIT_RADIUS * 2) {
             return false;
         }
     }
@@ -640,7 +641,7 @@ function handlePlacement(pos) {
     // Проверка за разстояние от столицата
     if (gameData.capitals[player]) {
         let capital = gameData.capitals[player];
-        if (Math.sqrt((x - capital[0])**2 + (y - capital[1])**2) < UNIT_RADIUS * 2 * scale) {
+        if (Math.sqrt((x - capital[0])**2 + (y - capital[1])**2) < UNIT_RADIUS * 2) {
             return false;
         }
     }
@@ -779,15 +780,12 @@ function calculateAverageDirection(unit1, unit2) {
 
 // Проверка и избутване на единици твърде близо до фронта
 function checkUnitsDistanceFromFront() {
-    const scale = getUnitScale();
-    let minDistance = UNIT_RADIUS * 2.1 * scale; // увеличено, за да не ги "настига" фронта
+    let minDistance = UNIT_RADIUS * 1.5;
     for (let player of [0, 1]) {
         for (let unit of gameData.playerUnits[player]) {
-            // Не избутвай, ако вече е избутван или се движи
-            if (unit.beingPushed || unit.isMoving) continue;
-
             let closestPoint = null;
             let closestDist = Infinity;
+            
             for (let point of gameData.frontLine) {
                 let dist = Math.sqrt((unit.x - point[0])**2 + (unit.y - point[1])**2);
                 if (dist < closestDist) {
@@ -795,20 +793,19 @@ function checkUnitsDistanceFromFront() {
                     closestPoint = point;
                 }
             }
-            // Ако е твърде близо, избутай така че да е точно на minDistance
+            
             if (closestDist < minDistance && closestPoint) {
                 let pushDirX = unit.x - closestPoint[0];
                 let pushDirY = unit.y - closestPoint[1];
                 let pushLen = Math.sqrt(pushDirX**2 + pushDirY**2);
+                
                 if (pushLen > 0.001) {
                     pushDirX /= pushLen;
                     pushDirY /= pushLen;
-                } else {
-                    // Ако е точно върху фронта, избутай надясно/наляво според играча
-                    pushDirX = player === 0 ? -1 : 1;
-                    pushDirY = 0;
                 }
-                let pushDistance = minDistance - closestDist + 1; // +1 за сигурност
+                
+                let pushDistance = minDistance - closestDist;
+                
                 unit.beingPushed = true;
                 unit.prevX = unit.x;
                 unit.prevY = unit.y;
@@ -820,17 +817,19 @@ function checkUnitsDistanceFromFront() {
     }
 }
 
+// Проверка и избутване на единици при движение на фронтова линия
 function checkAndPushUnits(pointIdx, newPoint, direction, pushingPlayer) {
-    const scale = getUnitScale();
     let [px, py] = gameData.frontLine[pointIdx];
     let [newPx, newPy] = newPoint;
+    
     let opponent = 1 - pushingPlayer;
     for (let unit of gameData.playerUnits[opponent]) {
         let dist = Math.sqrt((unit.x - newPx)**2 + (unit.y - newPy)**2);
-        if (dist < 1.5 * UNIT_RADIUS * scale) {
-            let pushDistance = 1.5 * UNIT_RADIUS * scale - dist;
+        if (dist < 1.5 * UNIT_RADIUS) {
+            let pushDistance = 1.5 * UNIT_RADIUS - dist;
             let pushDirX = Math.cos(direction);
             let pushDirY = Math.sin(direction);
+            
             unit.beingPushed = true;
             unit.prevX = unit.x;
             unit.prevY = unit.y;
@@ -1180,16 +1179,13 @@ function calculateBattle() {
         let winner = null;
         if (i === 0 && gameData.frontLineWinners) winner = gameData.frontLineWinners[0];
         else if (i === gameData.frontLine.length - 1 && gameData.frontLineWinners) winner = gameData.frontLineWinners[1];
-        // Определяме победителя за вътрешните точки (по силата)
-        // Тук не винаги има winner, но няма да местим ако няма
-        // Може да се разшири ако има нужда
-        if (
-            winner !== null &&
-            isInOwnTerritory(winner, gameData.frontLine[i][0], gameData.frontLine[i][1]) &&
-            typeof oldFrontLine !== "undefined" &&
-            oldFrontLine[i]
-        ) {
-            // Връщаме точката на старата позиция, само ако има такава
+        else {
+            // Определяме победителя за вътрешните точки (по силите)
+            // Тук не винаги има winner, но няма да местим ако няма
+            // Може да се разшири ако има нужда
+        }
+        if (winner !== null && isInOwnTerritory(winner, gameData.frontLine[i][0], gameData.frontLine[i][1])) {
+            // Връщаме точката на старата позиция
             gameData.frontLine[i][0] = oldFrontLine[i][0];
             gameData.frontLine[i][1] = oldFrontLine[i][1];
         }
@@ -1261,27 +1257,27 @@ function clampFrontLineToLand() {
 
 // Подготовка на движенията на единиците
 function prepareUnitMovements() {
-    const scale = getUnitScale();
     for (let player of [0, 1]) {
         for (let unit of gameData.playerUnits[player]) {
             if (unit.blueArrow) {
                 let [endX, endY] = unit.blueArrow;
+                // Ограничаване на дължината при движение
                 let dx = endX - unit.x;
                 let dy = endY - unit.y;
                 let dist = Math.hypot(dx, dy);
-                let maxLen = BLUE_ARROW_LENGTH * scale;
+                let maxLen = BLUE_ARROW_LENGTH;
                 if (dist > maxLen) {
-                    let s = maxLen / dist;
-                    endX = unit.x + dx * s;
-                    endY = unit.y + dy * s;
+                    let scale = maxLen / dist;
+                    endX = unit.x + dx * scale;
+                    endY = unit.y + dy * scale;
                 }
                 unit.targetX = endX;
                 unit.targetY = endY;
                 unit.isMoving = true;
                 unit.moveProgress = 0;
             } else if (unit.direction !== null) {
-                let endX = unit.x + BLACK_ARROW_LENGTH * scale * Math.cos(unit.direction);
-                let endY = unit.y + BLACK_ARROW_LENGTH * scale * Math.sin(unit.direction);
+                let endX = unit.x + BLACK_ARROW_LENGTH * Math.cos(unit.direction);
+                let endY = unit.y + BLACK_ARROW_LENGTH * Math.sin(unit.direction);
                 unit.targetX = endX;
                 unit.targetY = endY;
                 unit.isMoving = true;
@@ -1305,16 +1301,19 @@ function isUnitInSelection(unit) {
 // Рисуване на селекционния правоъгълник
 function drawSelection() {
     if (gameData.selectionStart && gameData.selectionEnd) {
-        const scale = getUnitScale();
         const [x1, y1] = gameData.selectionStart;
         const [x2, y2] = gameData.selectionEnd;
+        
+        // Прозрачен зелен фон за селекцията
         ctx.fillStyle = "rgba(0, 255, 0, 0.1)";
         ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
+        
+        // Зелен контур на селекцията с по-дебели линии
         ctx.beginPath();
         ctx.rect(x1, y1, x2 - x1, y2 - y1);
         ctx.strokeStyle = SELECTION_COLOR;
-        ctx.lineWidth = 3 * scale;
-        ctx.setLineDash([5 * scale, 3 * scale]);
+        ctx.lineWidth = 3; // Увеличаваме дебелината на линиите
+        ctx.setLineDash([5, 3]); // Променяме пунктира
         ctx.stroke();
         ctx.setLineDash([]);
         ctx.lineWidth = 1;
@@ -1555,11 +1554,11 @@ function drawGame() {
         let capital = gameData.capitals[player];
         if (capital) {
             ctx.beginPath();
-            ctx.arc(capital[0], capital[1], CAPITAL_RADIUS * getUnitScale(), 0, Math.PI * 2);
+            ctx.arc(capital[0], capital[1], CAPITAL_RADIUS, 0, Math.PI * 2);
             ctx.fillStyle = CAPITAL_COLOR;
             ctx.fill();
             ctx.strokeStyle = PLAYER_COLORS[player];
-            ctx.lineWidth = 3 * getUnitScale();
+            ctx.lineWidth = 3;
             ctx.stroke();
             ctx.lineWidth = 1;
         }
@@ -1713,7 +1712,7 @@ function drawGame() {
             ctx.lineTo(gameData.frontLine[i][0], gameData.frontLine[i][1]);
         }
         ctx.strokeStyle = FRONT_LINE_COLOR;
-        ctx.lineWidth =  2;
+        ctx.lineWidth = 2;
         ctx.stroke();
         ctx.lineWidth = 1;
         
@@ -1776,11 +1775,11 @@ function drawGame() {
         let capital = gameData.capitals[player];
         if (capital) {
             ctx.beginPath();
-            ctx.arc(capital[0], capital[1], CAPITAL_RADIUS * getUnitScale(), 0, Math.PI * 2);
+            ctx.arc(capital[0], capital[1], CAPITAL_RADIUS, 0, Math.PI * 2);
             ctx.fillStyle = CAPITAL_COLOR;
             ctx.fill();
             ctx.strokeStyle = PLAYER_COLORS[player];
-            ctx.lineWidth = 3 * getUnitScale();
+            ctx.lineWidth = 3;
             ctx.stroke();
             ctx.lineWidth = 1;
         }
@@ -1914,7 +1913,7 @@ canvas.addEventListener('mouseup', function(e) {
     let pos = screenToWorld([e.clientX - rect.left, e.clientY - rect.top]);
     if (gameData.phase.endsWith("_arrows") && !gameData.battlePhase && 
         gameData.selectionStart && gameData.selectionEnd) {
-        // Ако правоъгълникът е твърде малък, го игнорирай
+        // Ако правоъгълникът е твърде малък, го игнорираме
         const minX = Math.min(gameData.selectionStart[0], gameData.selectionEnd[0]);
         const maxX = Math.max(gameData.selectionStart[0], gameData.selectionEnd[0]);
         const minY = Math.min(gameData.selectionStart[1], gameData.selectionEnd[1]);
@@ -2030,7 +2029,7 @@ function handleCapitalPlacement(pos) {
     let player = gameData.currentPlayer;
 
     // Проверка за разстояние от фронтова линия
-    let minDistance = UNIT_RADIUS * 2 * getUnitScale();
+    let minDistance = UNIT_RADIUS * 2;
     for (let point of gameData.frontLine) {
         if (Math.sqrt((x - point[0])**2 + (y - point[1])**2) < minDistance) {
             return false;
@@ -2337,15 +2336,4 @@ function isInSeaZone(x, y) {
         }
     }
     return false;
-}
-
-// Utility: Проверка дали е избрана WW2 карта
-function isWW2Map() {
-    const mapSelect = document.getElementById('map-select');
-    return mapSelect && mapSelect.value === 'WW2';
-}
-
-// Utility: Връща скалата за единици (1 за всички карти, 1/3 за WW2)
-function getUnitScale() {
-    return isWW2Map() ? 1/3 : 1;
 }
